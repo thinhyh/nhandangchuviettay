@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-H0NW5Z2MYC"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'G-H0NW5Z2MYC');
+    </script>
+    <title>Digit Recognition WebApp</title>
+    <meta name="description" content="Simple Machine Learning Model into an WebApp using TensorFlow.js">
+    <meta name="keywords" content="Machine Learning, TensorFlow.js">
+    <meta name="author" content="Carlos Aguayo">
+    <style>
+      * {
+        text-align: center !important;
+      }
+        h1{
+        text-align: center;
+        margin-top: 20px !important;
+      }
+      #khung {
+        display: flex;
+      }
+      #paint {
+        border:3px solid black;
+        margin-left: 150px;
+      }
+      #predicted { 
+        font-size: 20px;
+        margin-top: 60px;
+        text-align: center;
+        
+      }
+      #number {
+        border: 3px solid black;
+        
+        margin-top: 30px;
+        text-align: center;
+        vertical-align: middle;
+      }
+       /* #clear {
+        text-align: center !important;
+        margin-left: 100px;
+      }  */
+       
+    </style>
+    <link rel="stylesheet" href="./static/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+    <script src="./static/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+    <script src="https://code.jquery.com/jquery-2.2.4.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.5.2/dist/tf.min.js"></script>
+  </head>
+  <body>
+    
+    <!--<script type="text/javascript" src="http://livejs.com/live.js"></script>-->
+    <div class="container">
+    <h1 class="text-primary">NHẬN DẠNG CHỮ VIẾT TAY</h1><br/>
+    <div id='khung' class="row" style="width: 100%;">
+        <div id="paint" style="float: left;">
+            <canvas id="myCanvas"></canvas>
+        </div>
+        <div style="margin-left: 400px;">
+          <h2 class="text-primary">PREDICT: <h2>
+            <div id="predicted">
+                <div id="number"></div>
+            </div>
+        </div>
+        
+    </div>
+    <br/>
+    <br/>
+    <button type="button" class="btn btn-outline-warning btn-lg" id="clear">CLEAR</button>
+    <br>
+    <br>
+    <div id="wrong"></div>
+    </div>
+    {% with messages = get_flashed_messages()%}
+      {%if messages%}
+        {%for message in messages%}
+          <h3 id="error">{{message}}</h3>
+        {%endfor%}
+      {%endif%}
+    {%endwith%}
+    <script>
+    var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    if (isMobile) {
+      $('#paint').css({'width': '60%'});
+      $('#number').css({'width': '30%', 'font-size': '240px'});
+      $('#clear').css({'font-size': '50px'});
+      $('#wrong').css({'font-size': '50px'});
+    } else {
+      $('#paint').css({'width': '300px'});
+      $('#number').css({'width': '150px', 'font-size': '120px'});
+      $('#clear').css({'font-size': '35px'});
+      $('#wrong').css({'font-wrong': '35px'});
+    }
+
+    var cw = $('#paint').width();
+    $('#paint').css({'height': cw + 'px'});
+
+    cw = $('#number').width();
+    $('#number').css({'height': cw + 'px'});
+
+    // From https://www.html5canvastutorials.com/labs/html5-canvas-paint-application/
+    var canvas = document.getElementById('myCanvas');
+    var context = canvas.getContext('2d');
+
+    var compuetedStyle = getComputedStyle(document.getElementById('paint'));
+    canvas.width = parseInt(compuetedStyle.getPropertyValue('width'));
+    canvas.height = parseInt(compuetedStyle.getPropertyValue('height'));
+
+    var mouse = {x: 0, y: 0};
+
+    canvas.addEventListener('mousemove', function(e) {
+      mouse.x = e.pageX - this.offsetLeft;
+      mouse.y = e.pageY - this.offsetTop;
+    }, false);
+
+    context.lineWidth = isMobile ? 60 : 25;
+    context.lineJoin = 'round';
+    context.lineCap = 'round';
+    context.strokeStyle = '#00ffae';
+
+    canvas.addEventListener('mousedown', function(e) {
+      context.moveTo(mouse.x, mouse.y);
+      context.beginPath();
+      canvas.addEventListener('mousemove', onPaint, false);
+    }, false);
+
+    canvas.addEventListener('mouseup', function() {
+      $('#number').html('<img id="spinner" src="spinner.gif"/>');
+      canvas.removeEventListener('mousemove', onPaint, false);
+      var img = new Image();
+      img.onload = function() {
+        context.drawImage(img, 0, 0, 28, 28);
+        data = context.getImageData(0, 0, 28, 28).data;
+        var input = [];
+        for(var i = 0; i < data.length; i += 4) {
+          input.push(data[i + 2] / 255);
+        }
+        predict(input, img);
+        // var w=window.open('about:blank','image from canvas');
+        // w.document.write("<img src='"+img.src+"' alt='from canvas'/>");
+      };
+      img.src = canvas.toDataURL('image/jpg');
+      // downloadImage(img.src, 'my-canvas.jpeg');
+    }, false);
+    
+    function downloadImage(data, filename = 'untitled.jpeg') {
+      var a = document.createElement('a');
+      a.href = data;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+    } 
+
+    var onPaint = function() {
+      context.lineTo(mouse.x, mouse.y);
+      context.stroke();
+    };
+
+    tf.loadLayersModel('static/model/asd/model.json').then(function(model) {
+      window.model = model;
+    });
+
+    // http://bencentra.com/code/2014/12/05/html5-canvas-touch-events.html
+    // Set up touch events for mobile, etc
+    canvas.addEventListener('touchstart', function (e) {
+      var touch = e.touches[0];
+      canvas.dispatchEvent(new MouseEvent('mousedown', {
+        clientX: touch.clientX,
+        clientY: touch.clientY
+      }));
+    }, false);
+    canvas.addEventListener('touchend', function (e) {
+      canvas.dispatchEvent(new MouseEvent('mouseup', {}));
+    }, false);
+    canvas.addEventListener('touchmove', function (e) {
+      var touch = e.touches[0];
+      canvas.dispatchEvent(new MouseEvent('mousemove', {
+        clientX: touch.clientX,
+        clientY: touch.clientY
+      }));
+    }, false);
+
+    var predict = function(input, dulieu) {
+      if (window.model) {
+        window.model.predict([tf.tensor(input).reshape([1, 28, 28, 1])]).array().then(function(scores){
+          scores = scores[0];
+          predicted = scores.indexOf(Math.max(...scores));
+          $('#number').html(predicted);
+          myFunction1(dulieu)
+          
+        });
+      } else {
+        // The model takes a bit to load, if we are too fast, wait
+        setTimeout(function(){predict(input)}, 50);
+      }
+    }
+    // <button type="button" class="btn btn-danger btn-lg" id="wrong" onclick="myFunction()">WRONG</button>
+    function myFunction(dulieu) {
+      var textnode = document.createElement('form');
+      textnode.setAttribute("id", "wrong");
+      textnode.setAttribute("method", "POST");
+      textnode.setAttribute("action", "/tfjs");
+      textnode.setAttribute("enctype", "multipart/form-data");
+      var item = document.getElementById("wrong");
+      item.parentNode.replaceChild(textnode, item);
+      var h1 = document.createElement('h3');
+      h1.innerHTML = "Nhập kết quả chính xác: "; 
+      h1.setAttribute("class", "text-danger");
+      var input = document.createElement('input');
+      input.setAttribute("type", "text");
+      input.setAttribute("class", "form-control");
+      input.setAttribute("class", "col-xs-3");
+      input.setAttribute("name", "num");
+      
+      var image = document.createElement('input');
+      image.setAttribute("type", "hidden");
+      image.setAttribute("id", "file");
+      image.setAttribute("value", dulieu.src);
+      image.setAttribute("class", "col-xs-3");
+      image.setAttribute("name", "file");
+      
+      var submit = document.createElement('button');
+      submit.innerHTML = "SUBMIT";
+      submit.setAttribute("type", "submit");
+      submit.setAttribute("value", "SUBMIT");
+      submit.setAttribute("class", "btn btn-danger");
+      submit.setAttribute("onclick", "takePic()");
+      submit.setAttribute("name", "submit");
+      var br = document.createElement('br');
+      var br1 = document.createElement('br');
+      document.getElementById("wrong").appendChild(h1);
+      document.getElementById("wrong").appendChild(input); 
+      document.getElementById("wrong").appendChild(br); 
+      document.getElementById("wrong").appendChild(br1);
+      document.getElementById("wrong").appendChild(submit); 
+      document.getElementById("wrong").appendChild(image); 
+    }
+
+    function myFunction1(dulieu) {
+      var textnode = document.createElement('div');
+      textnode.setAttribute("id", "wrong");
+      var item = document.getElementById("wrong");
+      item.parentNode.replaceChild(textnode, item);
+      var h1 = document.createElement('button');
+      h1.innerHTML = "WRONG";
+      h1.setAttribute("type", "button");
+      h1.setAttribute("class", "btn btn-danger btn-lg");
+      h1.setAttribute("id", "wrong");
+      // h1.setAttribute("onclick", "myFunction(alert("+dulieu.toString()+");)");
+      h1.addEventListener("click", function(event) {  
+        myFunction(dulieu);
+        event.preventDefault();
+      });
+      document.getElementById("wrong").appendChild(h1);
+    }
+
+    $("#wrong").hide();
+
+    $('#clear').click(function(){
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      $('#number').html('');
+    });
+    
+    $(document).ready(function(){
+      $("#clear").click(function(event){
+        $("#wrong").hide();
+      });
+    });
+    
+    $(document).ready(function(){
+      $("#myCanvas").click(function(event){
+        $("#error").hide();
+      });
+    });
+
+    </script>
+  </body>
+</html>
