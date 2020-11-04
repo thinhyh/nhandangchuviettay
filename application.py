@@ -92,4 +92,5 @@ def submit(num):
 
 if __name__ == "__main__":
     application.debug = True
-    application.run()
+    myPort = int(os.environ.get('PORT', 80))
+    application.run(host='0.0.0.0', port=myPort, debug=True)
